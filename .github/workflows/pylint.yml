@@ -16,7 +16,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Set up Python
+    - name: Set up Python 3.12
       uses: actions/setup-python@v4
       with:
         python-version: '3.12'
@@ -26,6 +26,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install pylint
 
-    - name: Run Pylint (allow warnings)
+    - name: Run pylint and ignore failures
       run: |
         pylint *.py || true
