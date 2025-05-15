@@ -2,15 +2,64 @@ import psutil
 import win32gui
 import sqlite3
 import time
+import requests
 from datetime import datetime
 from collections import defaultdict
 
 DB_FILE = "game_session.db"
-CHECK_INTERVAL = 10  # seconds
+STEAMGRID_API_KEY = "c991fa1b67b225a1dd12f28a4dced45c"
+HEADERS = {"Authorization": f"Bearer {STEAMGRID_API_KEY}"}
+CHECK_INTERVAL = 3  # seconds
+
 known_sessions = {}
 last_seen = defaultdict(lambda: time.time())
+lookup_cache = {}
+# WATCHED_GAMES = ["warframe.x64.exe"]
 
-WATCHED_GAMES = ["warframe.x64.exe"]
+
+def lookup_game(exe_name):
+    base = exe_name.lower().replace(".exe", "")
+    if base in lookup_cache:
+        return lookup_cache[base]
+
+    url = f"https://www.steamgriddb.com/api/v2/search/autocomplete/{base}"
+
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=3)
+        if response.status_code == 200:
+            data = response.json()
+            results = data.get("data", [])
+
+            for result in results:
+                name = result["name"]
+                if any(
+                    word in name.lower()
+                    for word in [
+                        "chrome",
+                        "discord",
+                        "notepad",
+                        "service",
+                        "helper",
+                        "driver",
+                        "settings",
+                        "studio",
+                        "node",
+                        "bar",
+                        "explorer",
+                        "python",
+                        "chatgpt",
+                    ]
+                ):
+                    continue  # Filter generic matches for now
+                if base in name.lower().replace(" ", ""):
+                    lookup_cache[base] = name
+                    return name  # Valid match
+            return None  # No match with SteamDB
+    except Exception as e:
+        print(f"Lookup error: {e}")
+
+    lookup_cache[base] = None
+    return None
 
 
 def get_window_title():
@@ -66,17 +115,20 @@ def main():
 
         # Start new session if not already known
         for name in active_names:
-            if name in WATCHED_GAMES and name not in known_sessions:
-                print(f"[START] {name} - {current_title}")
-                log_sesh_start(name, current_title)
-                known_sessions[name] = current_title
+            if name not in known_sessions:
+                game_title = lookup_game(name)
+                if game_title:
+                    print(f"[START] {game_title} - {current_title}")
+                    log_sesh_start(game_title, current_title)
+                    known_sessions[name] = current_title
 
         # End session if not seen for 10+ seconds ---> Edge case for games that have their own launcher (warframe)
         now = time.time()
         for name in list(known_sessions):
             if name not in active_names and now - last_seen[name] > 30:
-                print(f"[END] {name}")
-                log_sesh_end(name)
+                search_name = lookup_game(name)
+                print(f"[END] {search_name}")
+                log_sesh_end(search_name)
                 del known_sessions[name]
 
         time.sleep(CHECK_INTERVAL)
