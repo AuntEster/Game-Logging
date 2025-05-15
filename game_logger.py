@@ -7,7 +7,7 @@ from datetime import datetime
 from collections import defaultdict
 
 DB_FILE = "game_session.db"
-STEAMGRID_API_KEY = "c991fa1b67b225a1dd12f28a4dced45c"
+STEAMGRID_API_KEY = ""
 HEADERS = {"Authorization": f"Bearer {STEAMGRID_API_KEY}"}
 CHECK_INTERVAL = 3  # seconds
 
